@@ -60,7 +60,7 @@ spec:
         env:
         # Base de données PostgreSQL
         - name: DB_HOST
-          value: {{ include "odoo-client.fullname" . }}-postgresql.{{ .Release.Namespace }}.svc.cluster.local
+          value: {{ include "odoo-client.fullname" . }}-postgresql-0
         - name: DB_PORT
           value: "5432"
         - name: DB_USER
