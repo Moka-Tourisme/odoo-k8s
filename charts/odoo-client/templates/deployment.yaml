@@ -14,22 +14,37 @@ spec:
       labels:
         {{- include "odoo-client.selectorLabels" . | nindent 8 }}
     spec:
-      imagePullSecrets:                                           # ← MODIFICATION ICI
-        - name: {{ .Values.image.pullSecretName | default "ghcr-secret" }}
+      # Image pull secrets pour registry privé
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      
+      # Init container pour attendre PostgreSQL Bitnami
       initContainers:
       - name: wait-for-db
-        image: postgres:13-alpine
+        image: postgres:15-alpine
         command:
           - sh
           - -c
           - |
-            until pg_isready -h {{ printf "%s-postgresql-rw.%s.svc.cluster.local" (include "odoo-client.fullname" .) .Release.Namespace }} -p {{ .Values.odoo.dbPort }} -U {{ .Values.odoo.dbUser }}; do
-              echo "Waiting for PostgreSQL to be ready..."
+            echo "🔍 Waiting for PostgreSQL to be ready..."
+            until pg_isready \
+              -h {{ include "odoo-client.fullname" . }}-postgresql.{{ .Release.Namespace }}.svc.cluster.local \
+              -p 5432 \
+              -U {{ .Values.postgresql.auth.username }} \
+              -d {{ .Values.postgresql.auth.database }}; do
+              echo "⏳ PostgreSQL is unavailable - sleeping..."
               sleep 5
             done
+            echo "✅ PostgreSQL is ready!"
         env:
         - name: PGPASSWORD
-          value: {{ .Values.odoo.dbPassword | quote }}
+          valueFrom:
+            secretRef:
+              name: {{ include "odoo-client.fullname" . }}-postgresql
+              key: password
+      
       containers:
       - name: odoo
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -38,55 +53,110 @@ spec:
         - name: http
           containerPort: 8069
           protocol: TCP
+          
+        # Variables d'environnement pour Odoo avec PostgreSQL Bitnami
         env:
         - name: HOST
-          valueFrom:
-            secretKeyRef:
-              name: {{ include "odoo-client.fullname" . }}-odoo
-              key: ODOO_DB_HOST
+          value: {{ include "odoo-client.fullname" . }}-postgresql.{{ .Release.Namespace }}.svc.cluster.local
         - name: PORT
-          valueFrom:
-            secretKeyRef:
-              name: {{ include "odoo-client.fullname" . }}-odoo
-              key: ODOO_DB_PORT
+          value: "5432"
         - name: USER
-          valueFrom:
-            secretKeyRef:
-              name: {{ include "odoo-client.fullname" . }}-odoo
-              key: ODOO_DB_USER
+          value: {{ .Values.postgresql.auth.username | quote }}
         - name: PASSWORD
           valueFrom:
-            secretKeyRef:
-              name: {{ include "odoo-client.fullname" . }}-odoo
-              key: ODOO_DB_PASSWORD
+            secretRef:
+              name: {{ include "odoo-client.fullname" . }}-postgresql
+              key: password
+        - name: DB_NAME
+          value: {{ .Values.postgresql.auth.database | quote }}
+        
+        # Variables Odoo supplémentaires (optionnel)
+        - name: ODOO_DB_HOST
+          value: {{ include "odoo-client.fullname" . }}-postgresql.{{ .Release.Namespace }}.svc.cluster.local
+        - name: ODOO_DB_PORT
+          value: "5432"
+        - name: ODOO_DB_USER
+          value: {{ .Values.postgresql.auth.username | quote }}
+        - name: ODOO_DB_PASSWORD
+          valueFrom:
+            secretRef:
+              name: {{ include "odoo-client.fullname" . }}-postgresql
+              key: password
+        - name: ODOO_DB_NAME
+          value: {{ .Values.postgresql.auth.database | quote }}
+          
+        # Autres variables Odoo personnalisées
+        {{- if .Values.odoo.extraEnv }}
+        {{- range $key, $value := .Values.odoo.extraEnv }}
+        - name: {{ $key }}
+          value: {{ $value | quote }}
+        {{- end }}
+        {{- end }}
+          
         volumeMounts:
         - name: odoo-config
           mountPath: /etc/odoo/odoo.conf
           subPath: odoo.conf
         - name: odoo-data
           mountPath: /var/lib/odoo
+          
+        # Probes de santé optimisées
         livenessProbe:
           httpGet:
-            path: /web/database/selector
+            path: /web/health
             port: http
-          initialDelaySeconds: 120
+            httpHeaders:
+            - name: Host
+              value: {{ .Values.client.domain | quote }}
+          initialDelaySeconds: 180  # Plus de temps pour le démarrage initial
           periodSeconds: 30
-          timeoutSeconds: 10
+          timeoutSeconds: 15
+          failureThreshold: 3
+          successThreshold: 1
+          
         readinessProbe:
           httpGet:
             path: /web/database/selector
             port: http
+            httpHeaders:
+            - name: Host
+              value: {{ .Values.client.domain | quote }}
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 5
+          successThreshold: 1
+          
+        # Probe de startup pour éviter les restarts pendant l'initialisation
+        startupProbe:
+          httpGet:
+            path: /web/database/selector
+            port: http
+            httpHeaders:
+            - name: Host
+              value: {{ .Values.client.domain | quote }}
           initialDelaySeconds: 30
           periodSeconds: 10
-          timeoutSeconds: 5
+          timeoutSeconds: 10
+          failureThreshold: 30  # 5 minutes max pour démarrer
+          successThreshold: 1
+          
         resources:
           {{- toYaml .Values.resources | nindent 12 }}
+          
       volumes:
       - name: odoo-config
         configMap:
           name: {{ include "odoo-client.fullname" . }}-config
       - name: odoo-data
+        {{- if .Values.persistence.enabled }}
+        persistentVolumeClaim:
+          claimName: {{ include "odoo-client.fullname" . }}-data
+        {{- else }}
         emptyDir: {}
+        {{- end }}
+        
+      # Sélecteurs de nœuds et contraintes
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -98,4 +168,13 @@ spec:
       {{- with .Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      
+      # Gestion gracieuse de l'arrêt
+      terminationGracePeriodSeconds: 60
+      
+      # Contexte de sécurité (optionnel)
+      {{- if .Values.securityContext }}
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}
       {{- end }}
