@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "odoo-client.fullname" . }}
+  labels:
+    {{- include "odoo-client.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "odoo-client.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "odoo-client.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+      - name: wait-for-db
+        image: postgres:13-alpine
+        command:
+          - sh
+          - -c
+          - |
+            until pg_isready -h {{ printf "%s-postgresql-rw.%s.svc.cluster.local" (include "odoo-client.fullname" .) .Release.Namespace }} -p {{ .Values.odoo.dbPort }} -U {{ .Values.odoo.dbUser }}; do
+              echo "Waiting for PostgreSQL to be ready..."
+              sleep 5
+            done
+        env:
+        - name: PGPASSWORD
+          value: {{ .Values.odoo.dbPassword | quote }}
+      containers:
+      - name: odoo
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: 8069
+          protocol: TCP
+        env:
+        - name: HOST
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "odoo-client.fullname" . }}-odoo
+              key: ODOO_DB_HOST
+        - name: PORT
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "odoo-client.fullname" . }}-odoo
+              key: ODOO_DB_PORT
+        - name: USER
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "odoo-client.fullname" . }}-odoo
+              key: ODOO_DB_USER
+        - name: PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "odoo-client.fullname" . }}-odoo
+              key: ODOO_DB_PASSWORD
+        volumeMounts:
+        - name: odoo-config
+          mountPath: /etc/odoo/odoo.conf
+          subPath: odoo.conf
+        - name: odoo-data
+          mountPath: /var/lib/odoo
+        livenessProbe:
+          httpGet:
+            path: /web/database/selector
+            port: http
+          initialDelaySeconds: 120
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /web/database/selector
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        resources:
+          {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+      - name: odoo-config
+        configMap:
+          name: {{ include "odoo-client.fullname" . }}-config
+      - name: odoo-data
+        emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

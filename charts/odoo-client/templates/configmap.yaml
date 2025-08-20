@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "odoo-client.fullname" . }}-config
+  labels:
+    {{- include "odoo-client.labels" . | nindent 4 }}
+data:
+  odoo.conf: |
+    [options]
+    addons_path = /mnt/extra-addons
+    data_dir = /var/lib/odoo
+    db_host = {{ printf "%s-postgresql-rw.%s.svc.cluster.local" (include "odoo-client.fullname" .) .Release.Namespace }}
+    db_port = {{ .Values.odoo.dbPort }}
+    db_user = {{ .Values.odoo.dbUser }}
+    db_password = {{ .Values.odoo.dbPassword }}
+    db_name = {{ .Values.client.name }}
+    admin_passwd = {{ .Values.odoo.adminPassword }}
+    http_port = 8069
+    logfile = /var/log/odoo/odoo.log
+    log_level = info
+    workers = 2
+    max_cron_threads = 1

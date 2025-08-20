@@ -1,0 +1,19 @@
+client:
+  name: "argo1"
+  domain: "argo1.mokatourisme.dev"
+
+image:
+  repository: "ghcr.io/moka-tourisme/docker-moka"
+  tag: "18.0"
+
+odoo:
+  adminUser: "admin"
+  adminPassword: "admin"
+  dbUser: "odoo"
+  dbPassword: "odoo123"
+
+postgresql:
+  instances: 1
+  storage:
+    size: 10Gi
+    storageClass: "local-path"

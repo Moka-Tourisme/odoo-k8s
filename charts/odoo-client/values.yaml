@@ -1,0 +1,60 @@
+# Valeurs par défaut
+nameOverride: ""
+fullnameOverride: ""
+
+client:
+  name: "default-client"
+  domain: "example.com"
+
+image:
+  repository: "ghcr.io/moka-tourisme/docker-moka"  # Remplace par ton registry
+  pullPolicy: IfNotPresent
+  tag: "18.0"
+
+imagePullSecrets: []
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 8069
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+  tls:
+    enabled: true
+
+odoo:
+  adminUser: "admin"
+  adminPassword: "admin"
+  dbHost: ""  # Sera généré automatiquement
+  dbPort: 5432
+  dbUser: "odoo"
+  dbPassword: "odoo123"
+  dbName: ""  # Sera généré automatiquement
+
+postgresql:
+  enabled: true
+  instances: 1
+  primaryUpdateStrategy: unsupervised
+  storage:
+    size: 10Gi
+    storageClass: "local-path"  # Adapte selon ton cluster
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
