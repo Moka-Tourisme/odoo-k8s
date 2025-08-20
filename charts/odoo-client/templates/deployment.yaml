@@ -20,30 +20,6 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       
-      # Init container pour attendre PostgreSQL
-      initContainers:
-      - name: wait-for-db
-        image: postgres:15-alpine
-        command:
-          - sh
-          - -c
-          - |
-            echo "🔍 Waiting for PostgreSQL to be ready..."
-            until pg_isready \
-              -h {{ include "odoo-client.fullname" . }}-postgresql-0 \
-              -U {{ .Values.postgresql.auth.username }} \
-              -d {{ .Values.postgresql.auth.database }}; do
-              echo "⏳ PostgreSQL is unavailable - sleeping..."
-              sleep 5
-            done
-            echo "✅ PostgreSQL is ready!"
-        env:
-        - name: PGPASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: {{ include "odoo-client.fullname" . }}-postgresql
-              key: password
-      
       containers:
       - name: odoo
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
