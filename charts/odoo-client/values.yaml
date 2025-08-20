@@ -7,11 +7,12 @@ client:
   domain: "example.com"
 
 image:
-  repository: "ghcr.io/moka-tourisme/docker-moka"  # Remplace par ton registry
+  repository: "ghcr.io/moka-tourisme/docker-moka"
   pullPolicy: IfNotPresent
   tag: "18.0"
+  pullSecretName: "ghcr-secret"                    # ← NOUVELLE LIGNE
 
-imagePullSecrets: []
+# imagePullSecrets: []                             # ← LIGNE SUPPRIMÉE
 
 replicaCount: 1
 
@@ -45,7 +46,7 @@ postgresql:
   primaryUpdateStrategy: unsupervised
   storage:
     size: 10Gi
-    storageClass: "local-path"  # Adapte selon ton cluster
+    storageClass: "local-path"
 
 resources:
   limits:

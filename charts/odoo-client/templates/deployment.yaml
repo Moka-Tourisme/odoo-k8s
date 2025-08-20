@@ -14,10 +14,8 @@ spec:
       labels:
         {{- include "odoo-client.selectorLabels" . | nindent 8 }}
     spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+      imagePullSecrets:                                           # ← MODIFICATION ICI
+        - name: {{ .Values.image.pullSecretName | default "ghcr-secret" }}
       initContainers:
       - name: wait-for-db
         image: postgres:13-alpine
