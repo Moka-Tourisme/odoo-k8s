@@ -1,19 +1,83 @@
+# Configuration client
 client:
   name: "argo1"
   domain: "argo1.mokatourisme.dev"
 
+# Image Odoo officielle 18.0
 image:
-  repository: "ghcr.io/moka-tourisme/docker-moka"
+  repository: "odoo"
   tag: "18.0"
+  pullPolicy: IfNotPresent
+  # Pas de pullSecretName car image publique
 
+# Configuration Odoo
 odoo:
   adminUser: "admin"
   adminPassword: "admin"
   dbUser: "odoo"
   dbPassword: "odoo123"
+  # dbHost sera généré automatiquement par le chart
 
+# PostgreSQL Bitnami (garde ta config originale mais adaptée)
 postgresql:
-  instances: 1
-  storage:
-    size: 10Gi
-    storageClass: "local-path"
+  enabled: true
+  
+  # Configuration d'authentification
+  auth:
+    postgresPassword: "postgres123"  # Mot de passe admin
+    username: "odoo"                 # Ton utilisateur
+    password: "odoo123"              # Ton mot de passe
+    database: "argo1_odoo"           # Base dédiée
+
+  # Configuration du stockage (comme tu voulais)
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: "local-path"
+    
+    # Configuration PostgreSQL optimisée pour Odoo
+    configuration: |
+      shared_preload_libraries = 'pg_stat_statements'
+      max_connections = 200
+      shared_buffers = 256MB
+      effective_cache_size = 1GB
+      work_mem = 4MB
+      maintenance_work_mem = 64MB
+    
+    # Ressources
+    resources:
+      requests:
+        memory: 256Mi
+        cpu: 250m
+      limits:
+        memory: 1Gi
+        cpu: 500m
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  hosts:
+    - host: "argo1.mokatourisme.dev"
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    enabled: true
+    secretName: "argo1-tls"
+
+# Ressources Odoo
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 1500m
+    memory: 3Gi
+
+# Persistance Odoo (addons/filestore)
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClass: "local-path"
