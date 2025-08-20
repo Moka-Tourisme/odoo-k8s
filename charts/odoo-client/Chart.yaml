@@ -1,8 +1,12 @@
 apiVersion: v2
 name: odoo-client
-description: A Helm chart for Odoo with CloudNativePG database per client
+description: A Helm chart for Odoo client deployment
 type: application
 version: 0.1.0
-appVersion: "1.0"
+appVersion: "18.0"
 
-dependencies: []
+dependencies:
+- name: postgresql
+  version: "13.2.24"
+  repository: "https://charts.bitnami.com/bitnami"
+  condition: postgresql.enabled
