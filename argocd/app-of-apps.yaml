@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: odoo-app-of-apps
+  namespace: argocd
+  labels:
+    app: odoo-app-of-apps
+spec:
+  project: default
+  
+  source:
+    repoURL: https://github.com/Moka-Tourisme/odoo-k8s.git
+    targetRevision: HEAD
+    path: argocd/applications
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
