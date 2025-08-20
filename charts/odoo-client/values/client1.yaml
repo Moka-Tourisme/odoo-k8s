@@ -8,7 +8,6 @@ image:
   repository: "odoo"
   tag: "18.0"
   pullPolicy: IfNotPresent
-  # Pas de pullSecretName car image publique
 
 # Configuration Odoo
 odoo:
@@ -16,58 +15,34 @@ odoo:
   adminPassword: "admin"
   dbUser: "odoo"
   dbPassword: "odoo123"
-  # dbHost sera généré automatiquement par le chart
 
-# PostgreSQL Bitnami (garde ta config originale mais adaptée)
+# PostgreSQL Bitnami
 postgresql:
   enabled: true
-  
-  # Configuration d'authentification
   auth:
-    postgresPassword: "postgres123"  # Mot de passe admin
-    username: "odoo"                 # Ton utilisateur
-    password: "odoo123"              # Ton mot de passe
-    database: "argo1_odoo"           # Base dédiée
-
-  # Configuration du stockage (comme tu voulais)
+    postgresPassword: "postgres123"
+    username: "odoo"
+    password: "odoo123"
+    database: "argo1_odoo"
   primary:
     persistence:
       enabled: true
       size: 10Gi
       storageClass: "local-path"
-    
-    # Configuration PostgreSQL optimisée pour Odoo
-    configuration: |
-      shared_preload_libraries = 'pg_stat_statements'
-      max_connections = 200
-      shared_buffers = 256MB
-      effective_cache_size = 1GB
-      work_mem = 4MB
-      maintenance_work_mem = 64MB
-    
-    # Ressources
-    resources:
-      requests:
-        memory: 256Mi
-        cpu: 250m
-      limits:
-        memory: 1Gi
-        cpu: 500m
 
-# Ingress configuration
+# Ingress - Structure simplifiée
 ingress:
   enabled: true
   className: "nginx"
-  hosts:
-    - host: "argo1.mokatourisme.dev"
-      paths:
-        - path: /
-          pathType: Prefix
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
   tls:
     enabled: true
     secretName: "argo1-tls"
 
-# Ressources Odoo
+# Ressources
 resources:
   requests:
     cpu: 500m
@@ -76,7 +51,7 @@ resources:
     cpu: 1500m
     memory: 3Gi
 
-# Persistance Odoo (addons/filestore)
+# Persistance
 persistence:
   enabled: true
   size: 10Gi

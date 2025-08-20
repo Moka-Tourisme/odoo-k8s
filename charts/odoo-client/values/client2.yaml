@@ -8,90 +8,50 @@ image:
   repository: "odoo"
   tag: "18.0"
   pullPolicy: IfNotPresent
-  # Pas de pullSecretName car image publique
 
 # Configuration Odoo
 odoo:
   adminUser: "admin"
   adminPassword: "admin"
-  dbUser: "odoo"
-  dbPassword: "odoo456"  # Différent du client1 pour la sécurité
+  delUser: "odoo"
+  dbPassword: "odoo456"
 
-# PostgreSQL Bitnami - Base dédiée client2
+# PostgreSQL Bitnami
 postgresql:
   enabled: true
-  
-  # Configuration d'authentification
   auth:
-    postgresPassword: "postgres456"  # Différent du client1
-    username: "odoo"                 
-    password: "odoo456"              # Correspond à odoo.dbPassword
-    database: "argo2_odoo"           # Base dédiée au client2
-
-  # Configuration du stockage
+    postgresPassword: "postgres456"
+    username: "odoo"
+    password: "odoo456"
+    database: "argo2_odoo"
   primary:
     persistence:
       enabled: true
       size: 10Gi
       storageClass: "local-path"
-    
-    # Configuration PostgreSQL optimisée pour Odoo
-    configuration: |
-      shared_preload_libraries = 'pg_stat_statements'
-      max_connections = 200
-      shared_buffers = 256MB
-      effective_cache_size = 1GB
-      work_mem = 4MB
-      maintenance_work_mem = 64MB
-    
-    # Ressources (potentiellement différentes selon les besoins)
-    resources:
-      requests:
-        memory: 256Mi
-        cpu: 250m
-      limits:
-        memory: 1Gi
-        cpu: 500m
 
-# Ingress configuration - Domaine différent
+# Ingress - Structure simplifiée
 ingress:
   enabled: true
   className: "nginx"
-  hosts:
-    - host: "argo2.mokatourisme.dev"
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    enabled: true
-    secretName: "argo2-tls"  # Certificat dédié
   annotations:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+  tls:
+    enabled: true
+    secretName: "argo2-tls"
 
-# Ressources Odoo (adaptables selon client)
+# Ressources
 resources:
   requests:
-    cpu: 300m      # Client2 plus petit que client1
+    cpu: 300m
     memory: 768Mi
   limits:
     cpu: 1000m
     memory: 2Gi
 
-# Persistance Odoo
+# Persistance
 persistence:
   enabled: true
-  size: 8Gi       # Moins d'espace pour client2
+  size: 8Gi
   storageClass: "local-path"
-
-# Scaling (si nécessaire)
-replicaCount: 1
-
-# Configuration Odoo spécifique client2
-odoo:
-  config:
-    proxyMode: true
-    listDb: false
-    dbFilter: "^argo2_.*$"  # Filtrage sécurisé
-    workers: 1              # Moins de workers
-    maxCronThreads: 1
